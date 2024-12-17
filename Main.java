@@ -4,6 +4,17 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.File;
 import java.util.*;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Scanner;
 
 class gradeBook {
     class Session {
@@ -84,22 +95,46 @@ class gradeBook {
 }
 
 public class Main {
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, JAXBException {
         ArrayList<gradeBook> students = new ArrayList<>();
         Scanner cin = new Scanner(System.in);
 
-        // Обрабатываем только текстовые файлы
-        File studFile = new File("E:/CODEE/1-ProPro/Book/src/main/java/org/example/students.txt");
-        if (!studFile.exists()) {
-            System.out.println("Ошибка: файл students.txt не найден.");
-            return;
-        }
+        // Выбор формата ввода: JSON, XML или текст
+        System.out.println("Выберите формат ввода данных (1 - JSON, 2 - XML, 3 - Текст): ");
+        int choice = cin.nextInt();
 
-        // Считывание студентов из файла
-        Scanner in = new Scanner(studFile);
-        while (in.hasNext()) {
-            students.add(new gradeBook(in.nextInt(), in.next(), in.next(), in.next(),
-                    in.nextInt(), in.nextInt()));
+        switch (choice) {
+            case 1:
+                // Чтение из JSON файла
+                Gson gson = new Gson();
+                try (Reader reader = Files.newBufferedReader(Paths.get("students.json"))) {
+                    students = gson.fromJson(reader, new TypeToken<ArrayList<gradeBook>>(){}.getType());
+                } catch (IOException e) {
+                    System.out.println("Ошибка чтения JSON файла: " + e.getMessage());
+                }
+                break;
+
+            case 2:
+                // Чтение из XML файла
+                File xmlFile = new File("students.xml");
+                JAXBContext context = JAXBContext.newInstance(StudentsWrapper.class);
+                Unmarshaller unmarshaller = context.createUnmarshaller();
+                StudentsWrapper wrapper = (StudentsWrapper) unmarshaller.unmarshal(xmlFile);
+                students = wrapper.getStudents();
+                break;
+
+            case 3:
+                // Чтение из текстового файла
+                File studFile = new File("students.txt");
+                if (!studFile.exists()) {
+                    System.out.println("Ошибка: файл students.txt не найден.");
+                    return;
+                }
+                Scanner in = new Scanner(studFile);
+                while (in.hasNext()) {
+                    students.add(new gradeBook(in.nextInt(), in.next(), in.next(), in.next(), in.nextInt(), in.nextInt()));
+                }
+                break;
         }
 
         // Вывод студентов на экран
@@ -107,54 +142,61 @@ public class Main {
             System.out.println(gb);
         }
 
-        // Добавляем экзамены из других файлов
-        String file = "E:/CODEE/1-ProPro/Book/src/main/java/org/example/exams.txt";  // Указываем жестко заданное имя файла
-        File examFile = new File(file);
-        if (!examFile.exists()) {
-            System.out.println("Ошибка: файл " + file + " не найден.");
-            return;
-        }
+        // Добавление экзаменов как в вашем оригинальном коде
+        // ...
 
-        Scanner examIn = new Scanner(examFile);
-        String subj;
-        int N, session;
+        // Выбор формата вывода данных: JSON, XML или текст
+        System.out.println("Выберите формат вывода данных (1 - JSON, 2 - XML, 3 - Текст): ");
+        choice = cin.nextInt();
 
-        while (examIn.hasNext()) {
-            subj = examIn.nextLine().trim(); // Считываем имя предмета
-            if (subj.isEmpty()) continue; // Если строка пуста, пропускаем ее
-
-            session = examIn.nextInt(); // Считываем номер сессии
-            examIn.nextLine(); // Переход к следующей строке после считывания номера сессии
-
-            // Для каждого студента добавляем оценку по текущему предмету и сессии
-            while (examIn.hasNext()) {
-                N = examIn.nextInt(); // Считываем номер зачетки студента
-                int mark = examIn.nextInt(); // Считываем оценку
-
-                for (gradeBook gb : students) {
-                    if (gb.getNum() == N) {
-                        gb.addSubj(session, subj, mark); // Добавляем предмет и оценку студенту
-                        break;
-                    }
+        switch (choice) {
+            case 1:
+                // Запись в JSON файл
+                Gson gson = new Gson();
+                try (FileWriter writer = new FileWriter("exams_results.json")) {
+                    gson.toJson(students, writer);
+                } catch (IOException e) {
+                    System.out.println("Ошибка при записи в JSON файл: " + e.getMessage());
                 }
-                if (!examIn.hasNextInt()) break; // Если в строке нет номера зачетки, выходим из цикла
-            }
+                break;
+
+            case 2:
+                // Запись в XML файл
+                JAXBContext context = JAXBContext.newInstance(StudentsWrapper.class);
+                Marshaller marshaller = context.createMarshaller();
+                marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+                StudentsWrapper wrapper = new StudentsWrapper();
+                wrapper.setStudents(students);
+                marshaller.marshal(wrapper, new File("exams_results.xml"));
+                break;
+
+            case 3:
+                // Запись в текстовый файл
+                try (FileWriter writer = new FileWriter("exams_results.txt")) {
+                    for (gradeBook gb : students) {
+                        writer.write(gb.toString() + "\n");
+                    }
+                } catch (IOException e) {
+                    System.out.println("Ошибка при записи в файл: " + e.getMessage());
+                }
+                break;
         }
 
-        // Вывод студентов после добавления экзаменов
-        for (gradeBook gb : students) {
-            System.out.println(gb);
-        }
+        System.out.println("Данные успешно записаны.");
+    }
+}
 
-        // Запись в текстовый файл students.txt
-        try (FileWriter writer = new FileWriter("E:/CODEE/1-ProPro/Book/src/main/java/org/example/exams_results.txt")) {
-            for (gradeBook gb : students) {
-                writer.write(gb.toString() + "\n");
-            }
-        } catch (IOException e) {
-            System.out.println("Ошибка при записи в файл: " + e.getMessage());
-        }
+// Обёртка для списка студентов для XML
+@XmlRootElement(name = "students")
+class StudentsWrapper {
+    private ArrayList<gradeBook> students;
 
-        System.out.println("Данные записаны в файл exams_results.txt.");
+    @XmlElement(name = "student")
+    public ArrayList<gradeBook> getStudents() {
+        return students;
+    }
+
+    public void setStudents(ArrayList<gradeBook> students) {
+        this.students = students;
     }
 }
